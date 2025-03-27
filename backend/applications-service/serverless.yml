@@ -1,0 +1,90 @@
+service: job-tracker-applications
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 4000
+    host: 0.0.0.0
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    APPLICATIONS_TABLE: ${self:service}-${self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: !GetAtt ApplicationsTable.Arn
+
+functions:
+  createApplication:
+    handler: src/handlers/create.handler
+    events:
+      - http:
+          path: api/applications
+          method: post
+          cors: true
+
+  getApplications:
+    handler: src/handlers/getAll.handler
+    events:
+      - http:
+          path: api/applications
+          method: get
+          cors: true
+
+  getApplication:
+    handler: src/handlers/getOne.handler
+    events:
+      - http:
+          path: api/applications/{id}
+          method: get
+          cors: true
+
+  updateApplication:
+    handler: src/handlers/update.handler
+    events:
+      - http:
+          path: api/applications/{id}
+          method: put
+          cors: true
+
+  deleteApplication:
+    handler: src/handlers/delete.handler
+    events:
+      - http:
+          path: api/applications/{id}
+          method: delete
+          cors: true
+
+resources:
+  Resources:
+    ApplicationsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.APPLICATIONS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+  Outputs:
+    ApiUrl:
+      Description: "API Gateway endpoint URL"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}" 
